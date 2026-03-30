@@ -1,4 +1,5 @@
 from pathlib import Path
+from urllib.parse import urlparse, parse_qs
 import os
 try:
     from dotenv import load_dotenv
@@ -55,22 +56,47 @@ TEMPLATES = [
 WSGI_APPLICATION = "daypi_project.wsgi.application"
 ASGI_APPLICATION = "daypi_project.asgi.application"
 
+def parse_database_url(url: str):
+    parsed = urlparse(url)
+    scheme = (parsed.scheme or "").lower()
+    if scheme not in {"postgres", "postgresql"}:
+        raise ValueError(f"Unsupported DATABASE_URL scheme: {parsed.scheme}")
+
+    options = {key: values[-1] for key, values in parse_qs(parsed.query).items() if values}
+    db_name = (parsed.path or "").lstrip("/")
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": db_name,
+        "USER": parsed.username or "",
+        "PASSWORD": parsed.password or "",
+        "HOST": parsed.hostname or "",
+        "PORT": str(parsed.port or "5432"),
+        **({"OPTIONS": options} if options else {}),
+    }
+
+
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 DB_ENGINE = os.getenv("DB_ENGINE", "django.db.backends.sqlite3")
 
-DATABASES = {
-    "default": {
-        "ENGINE": DB_ENGINE,
-        "NAME": os.getenv("DB_NAME", str(BASE_DIR / "daypi.db")),
+if DATABASE_URL:
+    DATABASES = {
+        "default": parse_database_url(DATABASE_URL)
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": DB_ENGINE,
+            "NAME": os.getenv("DB_NAME", str(BASE_DIR / "daypi.db")),
+        }
+    }
 
-if "postgresql" in DB_ENGINE:
-    DATABASES["default"].update({
-        "USER": os.getenv("DB_USER", "postgres"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DB_PORT", "5432"),
-    })
+    if "postgresql" in DB_ENGINE:
+        DATABASES["default"].update({
+            "USER": os.getenv("DB_USER", "postgres"),
+            "PASSWORD": os.getenv("DB_PASSWORD", ""),
+            "HOST": os.getenv("DB_HOST", "127.0.0.1"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+        })
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
