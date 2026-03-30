@@ -1,0 +1,37 @@
+name: Deploy Daypi to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          passphrase: ${{ secrets.SERVER_SSH_PASSPHRASE }} # Keep or remove depending on your key setup
+          script: |
+            # 1. Navigate to the correct repository root
+            cd /var/www/daypi
+
+            # 2. Force the server to exactly match the main branch on GitHub
+            git fetch --all
+            git reset --hard origin/main
+
+            # Go into the Django directory
+            cd Daypi
+
+            # 3. Use the absolute path to the virtual environment (assuming venv is in /var/www/daypi/venv)
+            /var/www/daypi/venv/bin/pip install -r requirements.txt
+            /var/www/daypi/venv/bin/python manage.py migrate
+            /var/www/daypi/venv/bin/python manage.py collectstatic --noinput
+
+            # 4. Restart the server to apply changes
+            sudo systemctl restart daypi

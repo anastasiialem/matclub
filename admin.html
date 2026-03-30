@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Matclub Edition Admin Panel</title>
+    <link rel="icon" type="image/png" href="image.png?v=2" />
+    <link rel="stylesheet" href="styles.css?v=2" />
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']]
+        }
+      };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+      .admin-container { max-width: 1000px; margin: 0 auto; padding: 20px; color: var(--ink); position: relative; z-index: 10; }
+      .task-card { background: #fff; border: 1px solid #d1bfff; padding: 15px; border-radius: 14px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(108, 87, 173, 0.1); }
+      .task-card input, .task-card textarea { width: 100%; margin-bottom: 10px; background: rgba(255, 255, 255, 0.78); color: var(--ink); border: 1px solid rgba(135, 111, 221, 0.55); padding: 8px; border-radius: 8px; box-sizing:border-box; font-family:inherit;}
+      .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+      .muted { color: #5d4e88; font-size: 0.9em; display:block; margin-bottom: 4px; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <div class="admin-container">
+      <div class="header-row">
+        <h2>Панель керування задачами Matclub Edition</h2>
+        <div>
+          <a href="/" class="modal-btn modal-secondary" style="text-decoration:none; display:inline-block;">Повернутись на головну</a>
+        </div>
+      </div>
+      <div id="login-overlay" style="display:none; text-align:center; padding: 50px;">
+         <h3>Доступ заборонено</h3>
+         <p>Ви повинні бути авторизовані як адміністратор на головній сторінці.</p>
+      </div>
+      <div id="admin-content" style="display:none;">
+          <p style="margin-bottom:20px; color:#5d4e88;">Тут ви можете створювати, редагувати та обмежувати доступ до всіх кастомних задач. Можна вказувати теги, правильні відповіді та додавати зображення.</p>
+          
+          <div style="background:#e8f4f8; border:1px solid #b3d4fc; padding:12px; border-radius:10px; margin-bottom:20px; color:#31708f;">
+              <strong>ℹ️ Як використовувати математичні формули (LaTeX):</strong>
+              <p style="margin: 5px 0 0; font-size: 0.95em;">
+                 Щоб написати формулу в умові задачі, просто візьміть її у знаки долара: <code>$x^2 + y^2 = r^2$</code>. 
+                 Для великих формул по центру використовуйте подвійні знаки: <code>$$ \frac{a}{b} = c $$</code>.
+              </p>
+          </div>
+          
+          <div style="background:#fff; border:1px solid #d1bfff; padding:15px; border-radius:14px; margin-bottom:20px; box-shadow: 0 4px 12px rgba(108, 87, 173, 0.1);">
+              <h4 style="margin-top:0; margin-bottom:10px;">Глобальні налаштування</h4>
+              
+              <label class="muted">Вимкнені теги (через кому):</label>
+              <div style="display:flex; gap:10px; margin-bottom: 10px;">
+                  <input type="text" id="global-disabled-tags" style="flex:1; background:rgba(255, 255, 255, 0.78); color:var(--ink); border:1px solid rgba(135, 111, 221, 0.55); padding:8px; border-radius:8px;" placeholder="math, logic" />
+              </div>
+              
+              <label class="muted">Приховані користувачі (emails через кому, не будуть в рейтингу):</label>
+              <div style="display:flex; gap:10px;">
+                  <input type="text" id="global-hidden-users" style="flex:1; background:rgba(255, 255, 255, 0.78); color:var(--ink); border:1px solid rgba(135, 111, 221, 0.55); padding:8px; border-radius:8px;" placeholder="user1@ucu.edu.ua, user2@ucu.edu.ua" />
+              </div>
+              
+              <button class="modal-btn" onclick="saveGlobalConfig()" style="background:#4CAF50; width:100%; margin-top: 10px; padding:10px 15px;">Зберегти глобальні налаштування</button>
+          </div>
+          
+          <button id="btn-add-new" class="modal-btn" style="margin-bottom: 20px; width:auto; padding: 10px 20px;">+ Додати нову задачу</button>
+          
+          <div id="tasks-container"></div>
+      </div>
+    </div>
+    <script src="admin.js?v=2"></script>
+  </body>
+</html>

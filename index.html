@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="uk">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Matclub Edition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Playfair+Display:wght@600;700&display=swap"
+    rel="stylesheet" />
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']]
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <link rel="icon" type="image/png" href="image.png?v=2" />
+  <link rel="stylesheet" href="styles.css?v=2" />
+</head>
+
+<body>
+  <main class="workspace">
+    <section id="auth-section" class="panel auth-panel">
+      <h1 class="auth-title">Matclub Edition</h1>
+      <p class="auth-subtitle">Увійдіть або створіть акаунт, щоб розв'язувати задачі щодня.</p>
+      <div class="tabs">
+        <button id="show-login" class="tab active" type="button">Вхід</button>
+        <button id="show-register" class="tab" type="button">Реєстрація</button>
+      </div>
+
+      <div class="form-stage">
+        <form id="login-form" class="form active" autocomplete="off">
+          <input id="login-email" type="email" placeholder="Ваш email" required />
+          <input id="login-password" type="password" placeholder="Пароль" required />
+          <button type="submit">Увійти</button>
+        </form>
+
+        <form id="register-form" class="form" autocomplete="off">
+          <input id="register-name" type="text" placeholder="Ім'я" required />
+          <input id="register-email" type="email" placeholder="Ваш email" required />
+          <input id="register-age" type="number" min="5" max="120" placeholder="Вік" required />
+          <input id="register-place" type="text" placeholder="Місце навчання" required />
+          <input id="register-password" type="password" minlength="6" placeholder="Пароль" required />
+          <button type="submit">Зареєструватися</button>
+        </form>
+
+      </div>
+
+      <p id="message" class="message"></p>
+    </section>
+
+    <section id="app-section" class="panel app-panel hidden">
+      <header class="app-header">
+        <div>
+          <h3 id="welcome-title">Вітаю</h3>
+          <p id="user-meta" class="muted"></p>
+        </div>
+        <div class="rating-box">
+          <p id="points-header-label">Загальні бали</p>
+          <strong id="total-rating">0</strong>
+          <small id="rating-updated">Оновлено: --:--:--</small>
+        </div>
+      </header>
+
+      <section class="task-panel">
+        <div class="task-head" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <button id="prev-day-btn" class="modal-btn"
+            style="width:auto; padding:4px 8px; font-size:1.1em; background:transparent; color:#6b52c3; border: 1px solid #6b52c3;">&lt;</button>
+
+          <div style="text-align:center;">
+            <span id="day-label" class="pill" style="margin:0;"></span>
+          </div>
+
+          <button id="next-day-btn" class="modal-btn"
+            style="width:auto; padding:4px 8px; font-size:1.1em; background:transparent; color:#6b52c3; border: 1px solid #6b52c3;">&gt;</button>
+        </div>
+        <p id="tasks-description" class="muted">Щодня доступно 2 задачі. За вирішення найкращої ти отримаєш бали. Інша — для тренування!</p>
+        <div id="tasks-list" class="tasks-list hidden"></div>
+      </section>
+
+      <section class="stats-grid">
+        <article class="stat-card">
+          <h4 id="points-label">Бали акаунту</h4>
+          <p id="points-value" class="big-number">0</p>
+        </article>
+        <article class="stat-card">
+          <h4 id="accuracy-label">Середня правильність</h4>
+          <p id="accuracy-value" class="big-number">0%</p>
+        </article>
+      </section>
+
+      <section class="week-panel">
+        <h4 id="week-title">Статистика задач по днях</h4>
+        <div id="week-stats" class="week-stats"></div>
+      </section>
+
+      <section class="leaderboard-panel">
+        <div class="leaderboard-head">
+          <h4 id="leaderboard-title">Таблиця рейтингу</h4>
+          <button id="toggle-leaderboard-button" class="leaderboard-toggle" type="button">Показати</button>
+        </div>
+        <div id="leaderboard-wrap" class="leaderboard-wrap hidden">
+          <input type="text" id="leaderboard-search" placeholder="Пошук за іменем або місцем навчання..."
+            style="margin-bottom: 12px; width: 100%;" />
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th id="lb-col-place">Місце</th>
+                <th id="lb-col-name">Ім'я</th>
+                <th id="lb-col-points">Бали</th>
+                <th id="lb-col-accuracy">Точність</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="admin-section" class="admin-panel hidden">
+        <div class="leaderboard-head">
+          <h4 id="admin-title">Адмін журнал</h4>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button id="btn-toggle-tasks" class="modal-btn modal-secondary"
+              style="padding: 6px 12px; font-size: 0.9em; width: auto; background:#333; color:white;">Відкрити
+              задачі</button>
+            <button id="btn-lock-points" class="modal-btn modal-secondary"
+              style="padding: 6px 12px; font-size: 0.9em; width: auto; background:#7b1fa2; color:white;">🔒 Бали
+              закриті</button>
+            <a href="/admin-panel" class="modal-btn"
+              style="padding: 6px 12px; font-size: 0.9em; width: auto; text-decoration:none; color:white;">Панель
+              керування задачами</a>
+          </div>
+        </div>
+        <div class="leaderboard-wrap">
+          <table class="leaderboard-table">
+            <thead>
+              <tr>
+                <th id="admin-col-time">Час</th>
+                <th id="admin-col-user">Користувач</th>
+                <th id="admin-col-task">Задача</th>
+                <th id="admin-col-points">Бали</th>
+                <th id="admin-col-answer">Відповідь</th>
+              </tr>
+            </thead>
+            <tbody id="admin-log-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+  </main>
+
+  <button id="settings-button" class="settings-btn hidden" type="button" aria-label="Налаштування">⚙</button>
+
+  <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="modal-card settings-card">
+      <div class="settings-head">
+        <span class="settings-badge">⚙</span>
+        <div>
+          <h3 id="settings-title">Налаштування</h3>
+          <p id="settings-question">Що зробити?</p>
+        </div>
+      </div>
+
+      <section class="settings-section language-group">
+        <label id="language-label" for="language-select">Мова</label>
+        <select id="language-select">
+          <option value="uk">Українська</option>
+          <option value="en">English</option>
+        </select>
+        <button id="save-language-button" class="modal-btn modal-secondary" type="button">Змінити мову</button>
+        <p id="admin-info" class="settings-note">Для адмін-перегляду увійдіть з email, що містить admin.</p>
+      </section>
+
+      <section class="settings-section settings-actions">
+        <button id="back-button" class="modal-btn" type="button">Повернутись назад</button>
+        <button id="delete-account-button" class="modal-btn delete" type="button">Видалити акаунт</button>
+        <button id="logout-button" class="modal-btn logout" type="button">Вийти з акаунту</button>
+      </section>
+    </div>
+  </div>
+
+  <div id="task-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="task-modal-title">
+    <div class="modal-card task-modal-card">
+      <h3 id="task-modal-title">Умова задачі</h3>
+      <img id="task-modal-image" class="hidden" style="max-width:100%; border-radius:8px; margin-bottom:15px;" />
+      <p id="task-modal-condition" style="font-size:1.1em;"></p>
+      <div id="task-modal-already-solved" class="hidden" style="padding:10px; background:rgba(76,175,80,0.15); border:1px solid rgba(76,175,80,0.4); border-radius:8px; color:#2e7d32; margin-bottom:12px;"></div>
+      <div id="task-modal-answer-form">
+        <label id="answer-label" for="task-answer">Відповідь</label>
+        <textarea id="task-answer" rows="4" placeholder="Введіть відповідь..."></textarea>
+        <p id="symbols-label" class="symbols-label">Математичні символи:</p>
+        <div id="math-symbols" class="math-symbols"></div>
+        <button id="submit-answer-button" class="modal-btn" type="button">Надіслати відповідь</button>
+      </div>
+      <button id="cancel-task-button" class="modal-btn modal-secondary" type="button">Скасувати</button>
+    </div>
+  </div>
+
+
+
+  <script src="script.js?v=3"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,64 @@
+# Created by Antigravity Python/Django Template
+
+# Python artifacts
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+daypi.db
+daypi.db-journal
+
+# Environment variables
+.env
+.env.local
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and Editor directories
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Pytest / Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# OS/System generated
+Thumbs.db
+Desktop.ini
+
+
+# DB only (keep out of repo; config/tasks live in daypi.json and ARE committed)
+# daypi.json — REMOVED from ignore so tasks deploy with the repo and aren’t wiped on git pull
+daypi.db
