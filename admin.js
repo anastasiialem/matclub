@@ -51,15 +51,10 @@ async function fetchLatestConfig() {
 }
 
 async function persistConfig(nextConfig) {
-  try {
-    await api("/api/config", { method: "POST", body: JSON.stringify(nextConfig) });
-    serverConfig = nextConfig;
-    syncGlobalInputs();
-    alert("Збережено!");
-    renderTasks();
-  } catch (e) {
-    alert("Помилка збереження");
-  }
+  serverConfig = nextConfig;
+  syncGlobalInputs();
+  alert("Збережено!");
+  renderTasks();
 }
 
 window.saveGlobalConfig = function() {
@@ -249,50 +244,51 @@ btnAddNew.addEventListener("click", () => {
 });
 
 async function saveGlobalConfig() {
-  const latestConfig = await fetchLatestConfig();
-  latestConfig.disabled_tags = document.getElementById("global-disabled-tags").value.trim();
-  latestConfig.hidden_users = document.getElementById("global-hidden-users").value.trim();
-  await persistConfig(latestConfig);
+  try {
+    const result = await api("/api/admin/config-meta", {
+      method: "POST",
+      body: JSON.stringify({
+        disabled_tags: document.getElementById("global-disabled-tags").value.trim(),
+        hidden_users: document.getElementById("global-hidden-users").value.trim(),
+      })
+    });
+    await persistConfig(result.config);
+  } catch (e) {
+    alert("Помилка збереження");
+  }
 }
 
 async function deleteTask(index) {
   const existing = normalizeTask(serverConfig.custom_tasks[index] || {});
-  const latestConfig = await fetchLatestConfig();
-  const latestTasks = (latestConfig.custom_tasks || []).map(normalizeTask);
-  const existingFingerprint = taskFingerprint(existing);
-
-  latestConfig.custom_tasks = latestTasks.filter((task) => {
-    if (existing.id && task.id === existing.id) return false;
-    if (!existing.id && taskFingerprint(task) === existingFingerprint) return false;
-    return true;
-  });
-
-  await persistConfig(latestConfig);
+  try {
+    const result = await api("/api/admin/tasks/delete", {
+      method: "POST",
+      body: JSON.stringify({
+        id: existing.id || "",
+        original_fingerprint: taskFingerprint(existing),
+      })
+    });
+    await persistConfig(result.config);
+  } catch (e) {
+    alert("Помилка збереження");
+  }
 }
 
 async function saveTask(index) {
   const existing = normalizeTask(serverConfig.custom_tasks[index] || {});
   const updatedTask = collectTaskFromForm(index, existing);
-  const latestConfig = await fetchLatestConfig();
-  const latestTasks = (latestConfig.custom_tasks || []).map(normalizeTask);
-  const existingFingerprint = taskFingerprint(existing);
-  let replaced = false;
-
-  latestConfig.custom_tasks = latestTasks.map((task) => {
-    const sameId = updatedTask.id && task.id === updatedTask.id;
-    const sameFingerprint = !sameId && taskFingerprint(task) === existingFingerprint;
-    if (sameId || sameFingerprint) {
-      replaced = true;
-      return updatedTask;
-    }
-    return task;
-  });
-
-  if (!replaced) {
-    latestConfig.custom_tasks.unshift(updatedTask);
+  try {
+    const result = await api("/api/admin/tasks/upsert", {
+      method: "POST",
+      body: JSON.stringify({
+        task: updatedTask,
+        original_fingerprint: taskFingerprint(existing),
+      })
+    });
+    await persistConfig(result.config);
+  } catch (e) {
+    alert("Помилка збереження");
   }
-
-  await persistConfig(latestConfig);
 }
 
 if (!sessionUser || !sessionUser.is_admin) {

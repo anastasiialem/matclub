@@ -13,6 +13,9 @@ urlpatterns = [
     path("api/submissions/me", views.submissions_me),
     path("api/leaderboard", views.leaderboard),
     path("api/config", views.config),
+    path("api/admin/config-meta", views.admin_config_meta),
+    path("api/admin/tasks/upsert", views.admin_tasks_upsert),
+    path("api/admin/tasks/delete", views.admin_tasks_delete),
     path("admin-panel", views.admin_panel),
     path("admin.js", views.admin_script),
 ]

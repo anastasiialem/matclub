@@ -32,15 +32,63 @@ def _write_config(data):
     import json
     CONFIG_PATH.write_text(json.dumps(data, ensure_ascii=False), "utf-8")
 
+
+def _task_fingerprint(task):
+    return "|".join([
+        str(task.get("production_name") or ""),
+        str(task.get("titleUk") or ""),
+        str(task.get("titleEn") or ""),
+        str(task.get("conditionUk") or ""),
+        str(task.get("conditionEn") or ""),
+    ])
+
+
+def _generate_task_id():
+    return f"task_{int(timezone.now().timestamp() * 1000)}_{random.randint(1000, 9999)}"
+
+
+def _normalize_task_payload(payload, existing_id=None):
+    task_id = ((payload.get("id") or existing_id or _generate_task_id())[:64]).strip() or _generate_task_id()
+    try:
+        day_assigned = int(payload.get("day_assigned", 0) or 0)
+    except (TypeError, ValueError):
+        day_assigned = 0
+    day_assigned = max(0, min(4, day_assigned))
+
+    return {
+        "id": task_id,
+        "production_name": (payload.get("production_name") or "")[:255],
+        "titleUk": (payload.get("titleUk") or "")[:255],
+        "titleEn": (payload.get("titleEn") or "")[:255],
+        "conditionUk": (payload.get("conditionUk") or "")[:5000],
+        "conditionEn": (payload.get("conditionEn") or "")[:5000],
+        "imgUrl": (payload.get("imgUrl") or "")[:2000],
+        "allowedEmails": (payload.get("allowedEmails") or "")[:2000],
+        "tags": (payload.get("tags") or "")[:1000],
+        "answers": (payload.get("answers") or "")[:1000],
+        "fixed_points": str(payload.get("fixed_points") or "")[:16],
+        "fixed_accuracy": str(payload.get("fixed_accuracy") or "")[:16],
+        "is_hidden": bool(payload.get("is_hidden", False)),
+        "is_scored": bool(payload.get("is_scored", True)),
+        "day_assigned": day_assigned,
+    }
+
+
+def _get_admin_profile(request):
+    user = get_user_from_auth(request)
+    profile = Profile.objects.filter(user=user).first() if user else None
+    if not profile or not profile.is_admin:
+        return None, None
+    return user, profile
+
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
 def config(request):
     if request.method == "GET":
         return JsonResponse(_read_config())
     
-    user = get_user_from_auth(request)
-    profile = Profile.objects.filter(user=user).first() if user else None
-    if not profile or not profile.is_admin:
+    user, profile = _get_admin_profile(request)
+    if not profile:
         return JsonResponse({"detail": "Forbidden"}, status=403)
         
     try:
@@ -155,6 +203,109 @@ def get_user_from_auth(request):
     email, password = creds
     user = authenticate(username=email, password=password)
     return user
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def admin_config_meta(request):
+    user, profile = _get_admin_profile(request)
+    if not profile:
+        return JsonResponse({"detail": "Forbidden"}, status=403)
+
+    try:
+        payload = json_from_request(request)
+    except ValueError:
+        return JsonResponse({"ok": False, "message": "Invalid JSON"}, status=400)
+
+    config = _read_config()
+    if "tasks_open" in payload:
+        config["tasks_open"] = bool(payload.get("tasks_open"))
+    if "disabled_tags" in payload:
+        config["disabled_tags"] = (payload.get("disabled_tags") or "")[:2000]
+    if "hidden_users" in payload:
+        config["hidden_users"] = (payload.get("hidden_users") or "")[:4000]
+
+    _write_config(config)
+    return JsonResponse({"ok": True, "config": config})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def admin_tasks_upsert(request):
+    user, profile = _get_admin_profile(request)
+    if not profile:
+        return JsonResponse({"detail": "Forbidden"}, status=403)
+
+    try:
+        payload = json_from_request(request)
+    except ValueError:
+        return JsonResponse({"ok": False, "message": "Invalid JSON"}, status=400)
+
+    incoming = payload.get("task") or {}
+    original_fingerprint = (payload.get("original_fingerprint") or "")[:5000]
+    normalized = _normalize_task_payload(incoming, existing_id=incoming.get("id"))
+
+    config = _read_config()
+    tasks = config.get("custom_tasks") or []
+    updated = False
+    next_tasks = []
+
+    for task in tasks:
+        task_id = (task.get("id") or "")[:64]
+        if normalized["id"] and task_id and task_id == normalized["id"]:
+            next_tasks.append(normalized)
+            updated = True
+            continue
+        if not updated and original_fingerprint and _task_fingerprint(task) == original_fingerprint:
+            merged_id = task_id or normalized["id"]
+            next_tasks.append(_normalize_task_payload(normalized, existing_id=merged_id))
+            updated = True
+            continue
+        next_tasks.append(task)
+
+    if not updated:
+        next_tasks.append(normalized)
+
+    config["custom_tasks"] = next_tasks
+    _write_config(config)
+    return JsonResponse({"ok": True, "task": normalized, "config": config})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def admin_tasks_delete(request):
+    user, profile = _get_admin_profile(request)
+    if not profile:
+        return JsonResponse({"detail": "Forbidden"}, status=403)
+
+    try:
+        payload = json_from_request(request)
+    except ValueError:
+        return JsonResponse({"ok": False, "message": "Invalid JSON"}, status=400)
+
+    task_id = ((payload.get("id") or "")[:64]).strip()
+    original_fingerprint = (payload.get("original_fingerprint") or "")[:5000]
+    if not task_id and not original_fingerprint:
+        return JsonResponse({"ok": False, "message": "Task identifier required"}, status=400)
+
+    config = _read_config()
+    tasks = config.get("custom_tasks") or []
+    next_tasks = []
+    removed = False
+
+    for task in tasks:
+        current_id = (task.get("id") or "")[:64]
+        if task_id and current_id and current_id == task_id:
+            removed = True
+            continue
+        if not removed and original_fingerprint and _task_fingerprint(task) == original_fingerprint:
+            removed = True
+            continue
+        next_tasks.append(task)
+
+    config["custom_tasks"] = next_tasks
+    _write_config(config)
+    return JsonResponse({"ok": removed, "config": config})
 
 
 @csrf_exempt
