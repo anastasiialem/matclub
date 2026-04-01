@@ -34,17 +34,27 @@ async function api(path, options = {}) {
 async function loadConfig() {
   try {
     serverConfig = await api("/api/config");
-    document.getElementById("global-disabled-tags").value = serverConfig.disabled_tags || "";
-    document.getElementById("global-hidden-users").value = serverConfig.hidden_users || "";
+    syncGlobalInputs();
     renderTasks();
   } catch (e) {
     alert("Помилка завантаження конфігурації");
   }
 }
 
-async function saveConfig() {
+function syncGlobalInputs() {
+  document.getElementById("global-disabled-tags").value = serverConfig.disabled_tags || "";
+  document.getElementById("global-hidden-users").value = serverConfig.hidden_users || "";
+}
+
+async function fetchLatestConfig() {
+  return api("/api/config");
+}
+
+async function persistConfig(nextConfig) {
   try {
-    await api("/api/config", { method: "POST", body: JSON.stringify(serverConfig) });
+    await api("/api/config", { method: "POST", body: JSON.stringify(nextConfig) });
+    serverConfig = nextConfig;
+    syncGlobalInputs();
     alert("Збережено!");
     renderTasks();
   } catch (e) {
@@ -53,9 +63,7 @@ async function saveConfig() {
 }
 
 window.saveGlobalConfig = function() {
-  serverConfig.disabled_tags = document.getElementById("global-disabled-tags").value.trim();
-  serverConfig.hidden_users = document.getElementById("global-hidden-users").value.trim();
-  saveConfig();
+  saveGlobalConfig();
 }
 
 function escapeHTML(str) {
@@ -71,9 +79,60 @@ function generateTaskId() {
   return "task_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 11);
 }
 
+function taskFingerprint(task) {
+  return [
+    task.production_name || "",
+    task.titleUk || "",
+    task.titleEn || "",
+    task.conditionUk || "",
+    task.conditionEn || ""
+  ].join("|");
+}
+
+function normalizeTask(task) {
+  return {
+    ...task,
+    id: task.id || generateTaskId(),
+    production_name: task.production_name || "",
+    titleUk: task.titleUk || "",
+    titleEn: task.titleEn || "",
+    conditionUk: task.conditionUk || "",
+    conditionEn: task.conditionEn || "",
+    imgUrl: task.imgUrl || "",
+    allowedEmails: task.allowedEmails || "",
+    tags: task.tags || "",
+    answers: task.answers || "",
+    fixed_points: task.fixed_points || "",
+    fixed_accuracy: task.fixed_accuracy || "",
+    is_hidden: Boolean(task.is_hidden),
+    is_scored: task.is_scored !== false,
+    day_assigned: parseInt(task.day_assigned, 10) || 0
+  };
+}
+
+function collectTaskFromForm(index, fallbackTask = {}) {
+  return normalizeTask({
+    id: fallbackTask.id || generateTaskId(),
+    production_name: document.getElementById(`t-prod-name-${index}`).value.trim(),
+    titleUk: document.getElementById(`t-name-uk-${index}`).value.trim(),
+    titleEn: document.getElementById(`t-name-en-${index}`).value.trim(),
+    conditionUk: document.getElementById(`t-cond-uk-${index}`).value.trim(),
+    conditionEn: document.getElementById(`t-cond-en-${index}`).value.trim(),
+    imgUrl: document.getElementById(`t-img-${index}`).value.trim(),
+    allowedEmails: document.getElementById(`t-emails-${index}`).value.trim(),
+    tags: document.getElementById(`t-tags-${index}`).value.trim(),
+    answers: document.getElementById(`t-answers-${index}`).value.trim(),
+    fixed_points: document.getElementById(`t-points-${index}`).value,
+    fixed_accuracy: document.getElementById(`t-accuracy-${index}`).value,
+    is_hidden: document.getElementById(`t-hidden-${index}`).checked,
+    is_scored: document.getElementById(`t-is-scored-${index}`).checked,
+    day_assigned: parseInt(document.getElementById(`t-day-assigned-${index}`).value, 10) || 0
+  });
+}
+
 function renderTasks() {
   tasksContainer.innerHTML = "";
-  serverConfig.custom_tasks = serverConfig.custom_tasks || [];
+  serverConfig.custom_tasks = (serverConfig.custom_tasks || []).map(normalizeTask);
   
   if (serverConfig.custom_tasks.length === 0) {
       tasksContainer.innerHTML = "<p style='color:#777;'>У вас ще немає кастомних задач. Створіть першу!</p>";
@@ -170,44 +229,71 @@ function renderTasks() {
 
 window.deleteTask = function(index) {
   if (confirm("Точно видалити цю задачу?")) {
-    serverConfig.custom_tasks.splice(index, 1);
-    saveConfig();
+    deleteTask(index);
   }
 }
 
 window.saveTask = function(index) {
-  const existing = serverConfig.custom_tasks[index];
-  const stableId = (existing && existing.id) ? existing.id : generateTaskId();
-  serverConfig.custom_tasks[index] = {
-    id: stableId,
-    production_name: document.getElementById(`t-prod-name-${index}`).value.trim(),
-    titleUk: document.getElementById(`t-name-uk-${index}`).value.trim(),
-    titleEn: document.getElementById(`t-name-en-${index}`).value.trim(),
-    conditionUk: document.getElementById(`t-cond-uk-${index}`).value.trim(),
-    conditionEn: document.getElementById(`t-cond-en-${index}`).value.trim(),
-    imgUrl: document.getElementById(`t-img-${index}`).value.trim(),
-    allowedEmails: document.getElementById(`t-emails-${index}`).value.trim(),
-    tags: document.getElementById(`t-tags-${index}`).value.trim(),
-    answers: document.getElementById(`t-answers-${index}`).value.trim(),
-    fixed_points: document.getElementById(`t-points-${index}`).value,
-    fixed_accuracy: document.getElementById(`t-accuracy-${index}`).value,
-    is_hidden: document.getElementById(`t-hidden-${index}`).checked,
-    is_scored: document.getElementById(`t-is-scored-${index}`).checked,
-    day_assigned: parseInt(document.getElementById(`t-day-assigned-${index}`).value) || 0
-  };
-  saveConfig();
+  saveTask(index);
 }
 
 btnAddNew.addEventListener("click", () => {
-  serverConfig.custom_tasks.unshift({
+  serverConfig.custom_tasks.unshift(normalizeTask({
      id: generateTaskId(),
      production_name: "",
      titleUk: "Нова задача",
      titleEn: "New task",
      conditionUk: "", conditionEn: "", imgUrl: "", allowedEmails: "", tags: "", answers: "", fixed_points: "", fixed_accuracy: "", is_hidden: false, is_scored: true, day_assigned: 0
-  });
+  }));
   renderTasks();
 });
+
+async function saveGlobalConfig() {
+  const latestConfig = await fetchLatestConfig();
+  latestConfig.disabled_tags = document.getElementById("global-disabled-tags").value.trim();
+  latestConfig.hidden_users = document.getElementById("global-hidden-users").value.trim();
+  await persistConfig(latestConfig);
+}
+
+async function deleteTask(index) {
+  const existing = normalizeTask(serverConfig.custom_tasks[index] || {});
+  const latestConfig = await fetchLatestConfig();
+  const latestTasks = (latestConfig.custom_tasks || []).map(normalizeTask);
+  const existingFingerprint = taskFingerprint(existing);
+
+  latestConfig.custom_tasks = latestTasks.filter((task) => {
+    if (existing.id && task.id === existing.id) return false;
+    if (!existing.id && taskFingerprint(task) === existingFingerprint) return false;
+    return true;
+  });
+
+  await persistConfig(latestConfig);
+}
+
+async function saveTask(index) {
+  const existing = normalizeTask(serverConfig.custom_tasks[index] || {});
+  const updatedTask = collectTaskFromForm(index, existing);
+  const latestConfig = await fetchLatestConfig();
+  const latestTasks = (latestConfig.custom_tasks || []).map(normalizeTask);
+  const existingFingerprint = taskFingerprint(existing);
+  let replaced = false;
+
+  latestConfig.custom_tasks = latestTasks.map((task) => {
+    const sameId = updatedTask.id && task.id === updatedTask.id;
+    const sameFingerprint = !sameId && taskFingerprint(task) === existingFingerprint;
+    if (sameId || sameFingerprint) {
+      replaced = true;
+      return updatedTask;
+    }
+    return task;
+  });
+
+  if (!replaced) {
+    latestConfig.custom_tasks.unshift(updatedTask);
+  }
+
+  await persistConfig(latestConfig);
+}
 
 if (!sessionUser || !sessionUser.is_admin) {
   loginOverlay.style.display = "block";
